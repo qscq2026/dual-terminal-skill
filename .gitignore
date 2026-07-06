@@ -1,0 +1,10 @@
+# 环境变量
+.env
+
+# 共享目录（保留结构但忽略内容）
+.dual-claude/backup-*/
+.dual-claude/*.log
+
+# OS 文件
+.DS_Store
+Thumbs.db
