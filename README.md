@@ -44,11 +44,16 @@
 │          └──────────┬───────────────┘                      │
 │                     ↓                                      │
 │            .dual-claude/ (共享目录)                         │
-│            ├── status.txt        ← 状态机                  │
-│            ├── task.txt          ← 任务描述                │
-│            ├── worker-output.txt  ← Worker 输出             │
-│            ├── verifier-report.txt ← Verifier 报告        │
-│            └── iteration.txt     ← 迭代计数               │
+│            ├── status.txt              ← 状态机            │
+│            ├── task.txt                ← 任务描述          │
+│            ├── worker-output.txt       ← Worker 输出       │
+│            ├── verifier-report.txt     ← Verifier 报告     │
+│            ├── verifier-report-round-N.txt ← 归档报告      │
+│            ├── iteration.txt           ← 迭代计数          │
+│            ├── violation-log.txt       ← Worker 违规记录   │
+│            ├── verifier-violation-log.txt ← Verifier 漏判  │
+│            ├── .wait-elapsed-worker    ← Worker 累计等待    │
+│            └── .wait-elapsed-verifier  ← Verifier 累计等待  │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -91,7 +96,8 @@ dual-terminal-skill/
 │   ├── set-status.sh            # 状态原子写入脚本
 │   ├── bump-iteration.sh        # 迭代计数原子递增脚本（Verifier 用）
 │   └── log-verifier-miss.sh     # 记录 Verifier 漏判脚本
-├── README.md                    # 本文件
+├── README.md                       # 本文件
+├── ai-dual-model-research-report.html  # 双模型架构研究报告
 └── .gitignore                   # Git 忽略规则（忽略运行时生成的 .dual-claude/）
 ```
 
@@ -277,10 +283,14 @@ claude
 
 Claude 会自动：
 1. 检测到状态为 `WORKER_DONE`
-2. 读取 `.dual-claude/worker-output.txt`
-3. 以批判性视角审查代码
-4. 将审查报告写入 `.dual-claude/verifier-report.txt`
-5. 将结论写入状态文件（`NEEDS_FIX` / `APPROVED` / `REJECTED`）
+2. 读取 `.dual-claude/verifier-violation-log.txt`（自己的历史漏判记录，每轮都读）
+3. 读取 `.dual-claude/worker-output.txt`
+4. 第 2 轮起：对照上一轮归档报告交叉核对是否有漏判
+5. 以批判性视角审查代码（能实际验证的必须实际运行验证）
+6. 将审查报告写入 `.dual-claude/verifier-report.txt`
+7. 归档本轮报告副本到 `.dual-claude/verifier-report-round-N.txt`
+8. 递增迭代计数，写入结论（`NEEDS_FIX` / `APPROVED` / `REJECTED`）
+   - 最后一轮只能二选一：`APPROVED` 或 `REJECTED`（不会再 NEEDS_FIX）
 
 **Verifier 终端输出示例**：
 ```
