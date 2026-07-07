@@ -1,10 +1,3 @@
-# 环境变量
-.env
-
-# 共享目录（保留结构但忽略内容）
-.dual-claude/backup-*/
-.dual-claude/*.log
-
-# OS 文件
-.DS_Store
-Thumbs.db
+# 双终端协作运行时状态目录（任务描述、进度、审查报告、违规记录等）
+# 这些是每次任务运行时动态生成的，不应该提交进仓库
+.dual-claude/

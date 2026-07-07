@@ -12,7 +12,7 @@
 
 set -e
 
-PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 DUAL_DIR="$PROJECT_DIR/.dual-claude"
 
 echo "=========================================="
@@ -49,6 +49,20 @@ fi
 # 创建空的输出文件
 touch "$DUAL_DIR/worker-output.txt"
 touch "$DUAL_DIR/verifier-report.txt"
+
+# 初始化违规记录（跨轮次持久化，Worker 每轮循环开始时必须先读取）
+if [ ! -f "$DUAL_DIR/violation-log.txt" ]; then
+    echo "（暂无历史违规记录）" > "$DUAL_DIR/violation-log.txt"
+fi
+
+# 初始化 Verifier 漏判记录（对称机制：Verifier 每轮循环开始时必须先读取）
+if [ ! -f "$DUAL_DIR/verifier-violation-log.txt" ]; then
+    echo "（暂无历史漏判记录）" > "$DUAL_DIR/verifier-violation-log.txt"
+fi
+
+# 初始化累计等待秒数计数器（供 wait-for-status.sh 判断是否达到硬性超时上限）
+echo "0" > "$DUAL_DIR/.wait-elapsed-worker"
+echo "0" > "$DUAL_DIR/.wait-elapsed-verifier"
 
 echo ""
 echo "=========================================="
@@ -89,5 +103,8 @@ echo "    REJECTED      - 任务被驳回"
 echo ""
 echo "  .dual-claude/iteration.txt"
 echo "    当前迭代次数（由 Verifier 递增）"
+echo ""
+echo "  .dual-claude/violation-log.txt        - Worker 历史违规记录（Worker 每轮强制读取）"
+echo "  .dual-claude/verifier-violation-log.txt - Verifier 历史漏判记录（Verifier 每轮强制读取）"
 echo ""
 echo "=========================================="
