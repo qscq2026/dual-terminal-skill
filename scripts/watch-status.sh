@@ -33,8 +33,17 @@ while true; do
             "WORKER_DONE")
                 echo "  → Worker 已提交，Verifier 可以开始审查"
                 ;;
-            "VERIFIER_DONE")
-                echo "  → Verifier 已完成，Worker 可以读取报告"
+            "NEEDS_FIX")
+                echo "  → 🔧 需要修正，Worker 可以读取审查报告"
+                echo ""
+                echo "审查报告:"
+                cat "$DUAL_DIR/verifier-report.txt" 2>/dev/null | head -20
+                ;;
+            "REJECTED")
+                echo "  → ❌ 审查未通过，任务被驳回"
+                echo ""
+                echo "审查报告:"
+                cat "$DUAL_DIR/verifier-report.txt" 2>/dev/null
                 ;;
             "APPROVED")
                 echo "  → ✅ 审查通过，任务完成！"

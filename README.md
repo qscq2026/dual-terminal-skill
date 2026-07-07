@@ -257,7 +257,7 @@ Claude 会自动：
 2. 读取 `.dual-claude/worker-output.txt`
 3. 以批判性视角审查代码
 4. 将审查报告写入 `.dual-claude/verifier-report.txt`
-5. 将状态设置为 `VERIFIER_DONE`
+5. 将结论写入状态文件（`NEEDS_FIX` / `APPROVED` / `REJECTED`）
 
 **Verifier 终端输出示例**：
 ```
@@ -266,15 +266,15 @@ Claude 会自动：
 [Verifier] 独立审查中...
 [Verifier] 发现问题: JWT_SECRET 未做非空检查
 [Verifier] 写入审查报告...
-[Verifier] 设置状态: VERIFIER_DONE
+[Verifier] 设置状态: NEEDS_FIX
 ```
 
 ### 终端 A - Worker 读取结果
 
-Worker 检测到状态变为 `VERIFIER_DONE`，自动读取审查报告：
+Worker 检测到状态变为 `NEEDS_FIX` / `APPROVED` / `REJECTED`，自动读取审查报告：
 
 ```
-[Worker] 检测到状态: VERIFIER_DONE
+[Worker] 检测到状态: NEEDS_FIX
 [Worker] 读取审查报告...
 [Worker] 审查结果: NEEDS_FIX
 [Worker] 修正建议: 添加 JWT_SECRET 非空检查
@@ -282,13 +282,15 @@ Worker 检测到状态变为 `VERIFIER_DONE`，自动读取审查报告：
 [Worker] 重新提交...
 ```
 
+> Worker 不关心迭代次数，只看状态：APPROVED 就退出，NEEDS_FIX 就继续修，REJECTED 就重来。
+
 ### 循环直到通过
 
 ```
 Worker 提交 → Verifier 审查 → NEEDS_FIX → Worker 修正 → Verifier 审查 → APPROVED
 ```
 
-最大 3 次迭代，超过则人工介入。
+由用户指定的迭代次数，超过则人工介入。
 
 ### 终端 C - 监控状态（可选）
 
@@ -304,7 +306,7 @@ bash scripts/watch-status.sh
 [14:32:10] 状态变更: WORKER_DONE | 迭代: 1
   → Worker 已提交，Verifier 可以开始审查
 
-[14:32:45] 状态变更: VERIFIER_DONE | 迭代: 1
+[14:32:45] 状态变更: NEEDS_FIX | 迭代: 1
   → Verifier 已完成，Worker 可以读取报告
 
 [14:33:20] 状态变更: WORKER_DONE | 迭代: 2
@@ -333,41 +335,47 @@ bash scripts/watch-status.sh
                              │
                              │ Verifier 开始审查
                              ↓
-                    ┌─────────────────┐
-                    │ VERIFIER_DONE   │
-                    │ Verifier 已完成  │
-                    └────────┬────────┘
+              ┌──────────────────────────┐
+              │     NEEDS_FIX /          │
+              │  APPROVED / REJECTED     │
+              │  Verifier 写入结论       │
+              └────────┬─────────────────┘
+                       │
+              ┌────────┼──────────┐
+              │        │          │
+              ↓        ↓          ↓
+        ┌─────────┐ ┌──────┐ ┌─────────┐
+        │APPROVED │ │NEEDS_│ │REJECTED │
+        │  通过   │ │ FIX  │ │  重做   │
+        └─────────┘ └──┬───┘ └─────────┘
+                       │          │
+                       │          │
+                       ↓          ↓
+                  ┌─────────┐ ┌─────────┐
+                  │Worker 修│ │重新理解 │
+                  │正后提交 │ │  任务   │
+                  └────┬────┘ └────┬────┘
+                       │           │
+                       └─────┬─────┘
                              │
-              ┌──────────────┼──────────────┐
-              │              │              │
-              ↓              ↓              ↓
-        ┌─────────┐   ┌─────────┐   ┌─────────┐
-        │APPROVED │   │NEEDS_FIX│   │REJECTED │
-        │  通过   │   │ 需修正  │   │  重做   │
-        └─────────┘   └────┬────┘   └────┬────┘
-                             │              │
-                             │              │
-                             ↓              ↓
-                        ┌─────────┐   ┌─────────┐
-                        │Worker修正│   │重新理解 │
-                        │重新提交 │   │  任务   │
-                        └────┬────┘   └────┬────┘
-                             │              │
-                             └──────┬───────┘
-                                    │
-                                    ↓
-                           ┌─────────────────┐
-                           │   WORKER_DONE   │
-                           │   (循环开始)     │
-                           └─────────────────┘
+                             ↓
+                    ┌─────────────────┐
+                    │   WORKER_DONE   │
+                    │   (循环开始)     │
+                    └─────────────────┘
+
+                    迭代达到上限时：
+                    Verifier 在最后一轮只给出 APPROVED 或 REJECTED
+```
 ```
 
 | 状态 | 含义 | 谁可以操作 |
 |------|------|----------|
-| `IDLE` | 等待 Worker 开始 | Worker |
-| `WORKER_DONE` | Worker 已提交，等待审查 | Verifier |
-| `VERIFIER_DONE` | Verifier 已完成，Worker 可读取 | Worker |
-| `APPROVED` | 审查通过，任务完成 | 任意 |
+| `IDLE` | 等待 Worker 开始 | 仅 reset.sh |
+| `WORKER_DONE` | Worker 已提交，等待审查 | 仅 Worker |
+| `NEEDS_FIX` | 需要 Worker 修正 | 仅 Verifier |
+| `APPROVED` | 审查通过，任务完成 | 仅 Verifier |
+| `REJECTED` | 严重问题，需要重新理解任务 | 仅 Verifier |
 
 ---
 
@@ -378,7 +386,7 @@ bash scripts/watch-status.sh
 | 作弊方式 | 为什么不可能 | 技术原理 |
 |---------|------------|---------|
 | **伪造审查结果** | ❌ 不可能 | Worker 在终端 A，看不到终端 B 的 Verifier 输出 |
-| **跳过审查** | ❌ 不可能 | 状态机强制：Worker 必须等待 `VERIFIER_DONE` 才能继续 |
+| **跳过审查** | ❌ 不可能 | 状态机强制：Worker 必须等待 `NEEDS_FIX` / `APPROVED` / `REJECTED` 才能继续 |
 | **篡改审查报告** | ❌ 不可能 | Verifier 写入报告后设置状态，Worker 只能读取不能修改 |
 | **影响 Verifier 判断** | ❌ 不可能 | 两个终端完全独立，Worker 无法访问 Verifier 的进程/内存 |
 | **隐藏已知问题** | ⚠️ 可被检测 | Verifier 会检查 WORKER_REPORT 的完整性 |
@@ -455,11 +463,11 @@ echo "WORKER_DONE" > .dual-claude/status.txt
 # 查看当前状态
 cat .dual-claude/status.txt
 
-# 应该是 VERIFIER_DONE
+# 应该是 NEEDS_FIX / APPROVED / REJECTED
 
 # 如果 Verifier 已经完成但状态未更新：
 cat .dual-claude/verifier-report.txt  # 查看报告内容
-echo "VERIFIER_DONE" > .dual-claude/status.txt  # 手动更新状态
+echo "NEEDS_FIX" > .dual-claude/status.txt  # 手动更新状态（或 APPROVED / REJECTED）
 ```
 
 ### 问题 4: 迭代超过 3 次
@@ -578,8 +586,8 @@ echo "WORKER_DONE" > .dual-claude/status.txt
 # Verifier 会一直在等待，不会读取不完整的输出
 
 # 如果 Worker 试图伪造状态：
-echo "VERIFIER_DONE" > .dual-claude/status.txt
-# 但 Verifier 会覆盖这个状态，Worker 的伪造无效
+echo "NEEDS_FIX" > .dual-claude/status.txt
+# 但 Verifier 在下一轮会重新覆盖这个状态，Worker 的伪造无效
 ```
 
 ---

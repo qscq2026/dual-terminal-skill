@@ -18,41 +18,115 @@ description: >
 
 ## 执行流程
 
-### 1. 等待 Worker 完成
+### 0. 解析迭代上限（从用户指令）
+
+用户激活时可能会说：`开始审查` 或 `开始审查，本次循环5次`
+
+```bash
+# 从用户指令中提取循环次数
+# 如果说了"循环N次"或"循环N轮"，LIMIT = N
+# 如果没说，默认 3 次
+# （此处的数值由你根据用户实际输入判断）
+if [ "用户指定了循环次数" ]; then
+  LIMIT=用户说的数字
+else
+  LIMIT=3
+fi
+```
+
+### 整体循环（持续审查，到达迭代上限后退出）
+
+```bash
+# 提前准备：读取当前迭代次数
+ITER=$(cat .dual-claude/iteration.txt 2>/dev/null || echo "0")
+
+while [ "$ITER" -lt "$LIMIT" ]; do
+  # === 步骤 1: 等待 Worker 提交 ===
+  echo "等待 Worker 提交中...（第 $((ITER + 1))/$LIMIT 轮）"
+  while [ "$(cat .dual-claude/status.txt)" != "WORKER_DONE" ]; do
+    sleep 10
+  done
+
+  # === 步骤 2: 读取 Worker 输出 ===
+  cat .dual-claude/worker-output.txt
+
+  # === 步骤 3: 独立审查 ===
+  # ...（审查逻辑）
+
+  # === 步骤 4: 写入审查报告 ===
+  cat > .dual-claude/verifier-report.txt << 'EOF'
+[你的 VERIFIER_REPORT]
+EOF
+
+  # === 步骤 5: 递增迭代计数，写入结论 ===
+  ITER=$((ITER + 1))
+  echo "$ITER" > .dual-claude/iteration.txt
+
+  if [ "$ITER" -ge "$LIMIT" ]; then
+    # 最后一轮：必须出最终结论，不能再说 NEEDS_FIX
+    # 根据代码质量决定：
+    #   质量合格 → echo "APPROVED" > status.txt
+    #   质量不合格 → echo "REJECTED" > status.txt
+    echo "APPROVED" > .dual-claude/status.txt
+    echo "✅ 第 $ITER/$LIMIT 轮：达到迭代上限，审查通过"
+    break
+  else
+    # 非最后一轮：正常判断
+    # 根据审查质量决定结论
+    # echo "NEEDS_FIX"  > .dual-claude/status.txt  ← 需要修正，继续下一轮
+    # echo "APPROVED"  > .dual-claude/status.txt  ← 提前通过
+    # echo "REJECTED"  > .dual-claude/status.txt  ← 严重问题，退出
+    echo "NEEDS_FIX" > .dual-claude/status.txt
+  fi
+done
+
+# 循环结束后告知结果
+echo "审查流程结束，最终结论: $(cat .dual-claude/status.txt)"
+```
+
+各步骤单独说明：
+
+#### 等待 Worker 完成
 ```bash
 # 轮询等待（每 10 秒检查一次）
+# status.txt 的值必须是 WORKER_DONE 才继续
 while [ "$(cat .dual-claude/status.txt)" != "WORKER_DONE" ]; do
   sleep 10
   echo "等待 Worker 提交中..."
 done
 ```
 
-### 2. 读取 Worker 输出
+#### 读取 Worker 输出
 ```bash
 cat .dual-claude/worker-output.txt
 ```
 
-### 3. 独立审查
-
+#### 独立审查
 以**批判性视角**审查：
 - 假设 Worker 可能犯错
 - 逐项检查流程规范
 - 重点关注：安全漏洞、逻辑错误、边界条件
 
-### 4. 提交审查报告
+#### 写入审查报告
 ```bash
-# 写入审查报告
 cat > .dual-claude/verifier-report.txt << 'EOF'
 [你的 VERIFIER_REPORT]
 EOF
-
-# 更新状态
-echo "VERIFIER_DONE" > .dual-claude/status.txt
 ```
 
-### 5. 等待下一轮（如果需要）
+#### 递增迭代并设结论
+```bash
+ITER=$((ITER + 1))
+echo "$ITER" > .dual-claude/iteration.txt
 
-如果 Worker 修正后重新提交，状态会再次变为 WORKER_DONE，返回步骤 2。
+if [ "$ITER" -ge "$LIMIT" ]; then
+  # 最后一轮：只能 APPROVED 或 REJECTED（根据质量判断）
+  # echo "APPROVED" > .dual-claude/status.txt
+  # echo "REJECTED" > .dual-claude/status.txt
+else
+  echo "NEEDS_FIX" > .dual-claude/status.txt  # 或提前 APPROVED / REJECTED
+fi
+```
 
 ## 审查清单
 
