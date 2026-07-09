@@ -98,7 +98,7 @@ dual-terminal-skill/
 │   ├── next-round.sh            # 同一项目开始新一轮需求（set-task+reset的组合，保留信誉记录）
 │   └── track-blocker-streak.sh  # 追踪"连续无新增[阻塞]问题"轮数
 ├── README.md                       # 本文件
-├── ai-dual-model-research-report.html  # 双模型架构研究报告
+├── misc/                           # 外部参考文档（项目复盘记录、研究报告等）
 └── .gitignore                   # Git 忽略规则（忽略运行时生成的 .dual-claude/）
 ```
 
