@@ -27,6 +27,8 @@
 # 退出码:
 #   0 = 已等到目标状态之一（stdout 输出 MATCHED:<状态>）
 #   1 = 本轮窗口内未等到，未超硬上限，调用方应再次调用本脚本继续等待
+#       （累计等待超过 WAIT_ESCALATE_SECONDS 后，会在消息里升级提醒 + 响铃，
+#       但仍然返回 1，因为还没到硬上限，不代表可以停止轮询）
 #   2 = 累计等待已超过硬上限，调用方应停止轮询，提示人工介入
 #   3 = 参数错误或环境未初始化
 # ============================================================================
@@ -58,6 +60,7 @@ fi
 WAIT_STATE_FILE="$DUAL_DIR/.wait-elapsed-$ROLE"
 WINDOW=${WAIT_WINDOW_SECONDS:-90}
 INTERVAL=${WAIT_INTERVAL_SECONDS:-5}
+ESCALATE=${WAIT_ESCALATE_SECONDS:-300}
 HARD_CAP=${WAIT_HARD_CAP_SECONDS:-1800}
 
 ELAPSED=$(cat "$WAIT_STATE_FILE" 2>/dev/null || echo 0)
@@ -83,8 +86,15 @@ done
 echo "$ELAPSED" > "$WAIT_STATE_FILE"
 
 if [ "$ELAPSED" -ge "$HARD_CAP" ]; then
+    printf '\a' >&2
     echo "TIMEOUT_HARD_CAP:累计等待已达 ${ELAPSED}s（上限 ${HARD_CAP}s），当前状态仍为 '$CURRENT'，请勿继续轮询，改为提示用户检查另一终端是否卡住/已关闭"
     exit 2
+fi
+
+if [ "$ELAPSED" -ge "$ESCALATE" ]; then
+    printf '\a' >&2
+    echo "TIMEOUT_ESCALATE:已连续等待 ${ELAPSED}s（超过 ${ESCALATE}s 升级阈值），对方终端可能没有响应——建议现在就提醒用户去看一眼那个终端，而不是继续静默等待到硬上限（${HARD_CAP}s）才说话。本次仍会继续轮询"
+    exit 1
 fi
 
 echo "TIMEOUT_WINDOW:本轮 ${WINDOW}s 内未等到目标状态（当前 '$CURRENT'，目标之一: ${TARGETS[*]}），累计已等待 ${ELAPSED}s / ${HARD_CAP}s，请再次调用本脚本继续等待"
