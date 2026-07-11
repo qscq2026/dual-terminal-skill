@@ -127,6 +127,18 @@ echo "0" > "$DUAL_DIR/no-blocker-streak.txt"
 # 初始化事件日志（set-status.sh 每次状态转移时追加一行）
 : > "$DUAL_DIR/event-log.txt"
 
+# 初始化项目计划（里程碑清单）——Worker 第一轮开始前必须先写出这份计划，
+# 拆解出的每个里程碑要能独立提交、独立审查，不能读了任务直接一头扎进代码，
+# 也不能把整个任务当成一个大块一次性做完再交
+if [ ! -f "$DUAL_DIR/plan.md" ]; then
+    echo "（尚未规划——Worker 本轮开始前必须先把任务拆解成里程碑清单，见 SKILL-worker.md）" > "$DUAL_DIR/plan.md"
+fi
+if [ ! -f "$DUAL_DIR/plan-history.md" ]; then
+    echo "# 计划历史归档" > "$DUAL_DIR/plan-history.md"
+    echo "" >> "$DUAL_DIR/plan-history.md"
+    echo "> 每次 set-task.sh 更新任务，旧的里程碑计划会被追加到这里。" >> "$DUAL_DIR/plan-history.md"
+fi
+
 echo ""
 echo "=========================================="
 echo "  环境初始化完成"
@@ -175,6 +187,8 @@ echo "  .dual-claude/no-blocker-streak.txt    - 连续无新增[阻塞]问题轮
 echo "  .dual-claude/worker-phase.txt         - Worker 当前阶段（heartbeat.sh 维护，watch-status.sh 展示用）"
 echo "  .dual-claude/verifier-phase.txt       - Verifier 当前阶段（heartbeat.sh 维护，watch-status.sh 展示用）"
 echo "  .dual-claude/event-log.txt            - 状态转移历史（set-status.sh 自动追加）"
+echo "  .dual-claude/plan.md                  - 里程碑清单（Worker 第一轮写出，Verifier 逐个确认勾选）"
+echo "  .dual-claude/plan-history.md          - plan.md 的历史版本归档（set-task.sh 维护）"
 echo ""
 echo "💡 建议开第三个终端跑 'bash scripts/watch-status.sh' 实时盯着双方进度"
 echo ""

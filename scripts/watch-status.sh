@@ -45,7 +45,14 @@ hr() { printf '%.0s-' $(seq 1 44); echo; }
 count_entries() {
     # 统计 violation-log.txt / verifier-violation-log.txt 里的记录条数
     # （条目格式固定以"[第"开头，占位符文本不会被计入）
-    grep -c '^\[第' "$1" 2>/dev/null || echo 0
+    #
+    # 注意：不能写成 `grep -c ... || echo 0`——grep -c 在"文件存在但零匹配"
+    # 时会正常打印"0"但退出码是1，`||` 分支会照样触发，导致 "0" 被打印两次、
+    # 拼成两行的 "0\n0" 赋给调用方。用 ${x:-0} 兜底只在 grep 完全没有输出时
+    # （比如文件不存在）才补 0，不会重复。
+    local n
+    n=$(grep -c '^\[第' "$1" 2>/dev/null)
+    echo "${n:-0}"
 }
 
 fingerprint() {
@@ -62,6 +69,7 @@ fingerprint() {
         "$DUAL_DIR/violation-log.txt" \
         "$DUAL_DIR/verifier-violation-log.txt" \
         "$DUAL_DIR/event-log.txt" \
+        "$DUAL_DIR/plan.md" \
         2>/dev/null | cksum
 }
 
@@ -139,6 +147,24 @@ render() {
     hr
     head -c 200 "$DUAL_DIR/task.txt" 2>/dev/null | sed 's/^/  /'
     echo ""
+    echo ""
+
+    # ---- 计划进度 ----
+    local plan_total plan_done plan_current
+    plan_total=$(grep -c '^- \[[ x]\] M[0-9]' "$DUAL_DIR/plan.md" 2>/dev/null)
+    plan_total=${plan_total:-0}
+    plan_done=$(grep -c '^- \[x\] M[0-9]' "$DUAL_DIR/plan.md" 2>/dev/null)
+    plan_done=${plan_done:-0}
+    hr
+    echo "计划进度"
+    hr
+    if [ "$plan_total" -eq 0 ] 2>/dev/null; then
+        echo "  （尚未规划）"
+    else
+        echo "  里程碑: ${plan_done} / ${plan_total} 已完成"
+        plan_current=$(grep -m1 '^- \[ \] M[0-9]' "$DUAL_DIR/plan.md" 2>/dev/null | sed 's/^- \[ \] //')
+        [ -n "$plan_current" ] && echo "  当前: $plan_current"
+    fi
     echo ""
 
     # ---- 最近事件 ----
