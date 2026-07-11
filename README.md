@@ -25,43 +25,36 @@
 
 ## 架构概述
 
-<div align="center" style="max-width:620px;margin:0 auto;padding:12px;border:1.5px solid #ddd;border-radius:10px;background:#fafafa">
-
-<strong style="font-size:1.05rem;display:block;margin-bottom:8px">双终端协作架构</strong>
-
-<!-- Worker -->
-<div style="display:inline-block;width:44%;vertical-align:top;border:2px solid #38bdf8;border-radius:8px;padding:8px 10px;margin:4px;background:#fff;min-height:110px;text-align:left">
-<div style="font-weight:700;color:#38bdf8;font-size:.88rem;margin-bottom:4px">Worker 终端 A</div>
-<div style="font-size:.78rem;color:#555;line-height:1.7">
-• 读任务 + 违规记录<br>
-• 规划里程碑 (plan.md)<br>
-• checkpoint + 按里程碑改码<br>
-• 确认改动落地 → 提交
-</div>
-</div>
-
-<!-- Arrow right -->
-<div style="display:inline-block;width:6%;font-size:.6rem;color:#999;vertical-align:top;padding:55px 0 0;text-align:center">⇄</div>
-
-<!-- Verifier -->
-<div style="display:inline-block;width:44%;vertical-align:top;border:2px solid #f59e0b;border-radius:8px;padding:8px 10px;margin:4px;background:#fff;min-height:110px;text-align:left">
-<div style="font-weight:700;color:#f59e0b;font-size:.88rem;margin-bottom:4px">Verifier 终端 B</div>
-<div style="font-size:.78rem;color:#555;line-height:1.7">
-• 解析 LIMIT + 读取漏判记录<br>
-• 核对里程碑 + 交叉核对<br>
-• 审查（技术一~四）<br>
-• 勾选里程碑 + 结论
-</div>
-</div>
-
-<!-- Shared dir -->
-<div style="margin:10px auto 0;border:1.5px dashed #aaa;border-radius:6px;padding:6px;background:#f0f0f0;font-size:.72rem;color:#666;text-align:center">
-.dual-claude/ — status.txt · task.txt · plan.md · worker-output.txt · verifier-report.txt · iteration.txt · limit.txt · violation-log.txt · event-log.txt · ...
-</div>
-
-<!-- Arrows connotation -->
-<div style="font-size:.65rem;color:#999;margin-top:6px">两终端完全独立，仅通过 .dual-claude/ 目录异步通信 · Worker 无迭代上限（while true）· Verifier 有迭代上限（while ITER &lt; LIMIT）</div>
-</div>
+```
+ ┌────────────────────────────────────────────────────────────┐
+ │                   .dual-claude/ 共享目录                    │
+ │  status.txt · task.txt · plan.md · worker-output.txt        │
+ │  verifier-report.txt · iteration.txt · limit.txt            │
+ │  violation-log.txt · verifier-violation-log.txt              │
+ │  event-log.txt · no-blocker-streak.txt · ...               │
+ └────────────────────────────┬───────────────────────────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              │               │               │
+              ▼               │               ▼
+ ┌─────────────────────┐     │     ┌─────────────────────┐
+ │  Worker (终端 A)    │     │     │ Verifier (终端 B)   │
+ │                     │     │     │                     │
+ │  while true 循环    │     │     │  while ITER<LIMIT   │
+ │                     │     │     │                      │
+ │  1. 读任务+违规记录  │──────┼────→│ 1. 等 Worker 提交   │
+ │  2. 规划里程碑      │     │     │ 2. 读输出+核对范围  │
+ │  3. checkpoint      │     │     │ 3. 交叉核对+审查    │
+ │  4. 按里程碑改码    │     │     │ 4. 更新阻塞计数     │
+ │  5. 确认改动落地    │     │     │ 5. 写报告+勾里程碑  │
+ │  6. 提交+等待审查   │←────┼─────│ 6. 递增迭代+结论    │
+ │  7. 读报告+判断结果  │     │     │                     │
+ └─────────────────────┘     │     └─────────────────────┘
+                              │
+                   ┌──────────┴──────────┐
+                   │  共享文件异步通信     │
+                   │  两终端完全独立进程   │
+                   └─────────────────────┘
 
 > **关键设计**：两个终端的 Claude 实例**完全不共享内存、上下文或进程**。它们只通过 `.dual-claude/` 目录下的文本文件进行异步通信。
 
