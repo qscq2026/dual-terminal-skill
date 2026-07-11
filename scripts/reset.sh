@@ -36,6 +36,10 @@ cp "$DUAL_DIR/iteration.txt" "$BACKUP_DIR/" 2>/dev/null || true
 cp "$DUAL_DIR/violation-log.txt" "$BACKUP_DIR/" 2>/dev/null || true
 cp "$DUAL_DIR/verifier-violation-log.txt" "$BACKUP_DIR/" 2>/dev/null || true
 cp "$DUAL_DIR/no-blocker-streak.txt" "$BACKUP_DIR/" 2>/dev/null || true
+cp "$DUAL_DIR/event-log.txt" "$BACKUP_DIR/" 2>/dev/null || true
+cp "$DUAL_DIR/worker-phase.txt" "$BACKUP_DIR/" 2>/dev/null || true
+cp "$DUAL_DIR/verifier-phase.txt" "$BACKUP_DIR/" 2>/dev/null || true
+cp "$DUAL_DIR/limit.txt" "$BACKUP_DIR/" 2>/dev/null || true
 cp "$DUAL_DIR"/verifier-report-round-*.txt "$BACKUP_DIR/" 2>/dev/null || true
 
 # 重置状态（原子写：先写临时文件再 mv，避免另一终端在写入过程中读到半截内容）
@@ -55,6 +59,15 @@ echo "0" > "$DUAL_DIR/.wait-elapsed-verifier"
 
 # 重置"连续无新增阻塞问题"计数器（每个任务重新开始计）
 echo "0" > "$DUAL_DIR/no-blocker-streak.txt"
+
+# 重置事件日志和阶段上报（新一轮从空白仪表盘开始，不带上一轮的历史事件）
+: > "$DUAL_DIR/event-log.txt"
+{ date +%s; echo "(尚未开始)"; } > "$DUAL_DIR/worker-phase.txt"
+{ date +%s; echo "(尚未开始)"; } > "$DUAL_DIR/verifier-phase.txt"
+
+# limit.txt 由 Verifier 在下一轮启动时按用户口头指定的值重新写入，这里直接
+# 移除，避免仪表盘展示上一轮遗留的旧上限
+rm -f "$DUAL_DIR/limit.txt"
 
 # 注意：checkpoint-count.txt 和 task-history.md 不在这里重置——前者用来保证
 # git checkpoint 标签不因重置而重号覆盖历史回滚点，后者是跨任务的永久归档，

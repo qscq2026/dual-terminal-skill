@@ -113,6 +113,20 @@ echo "0" > "$DUAL_DIR/checkpoint-count.txt"
 # 用来判断循环是否该收敛，而不是无限找细节问题）
 echo "0" > "$DUAL_DIR/no-blocker-streak.txt"
 
+# 初始化阶段上报文件（heartbeat.sh 维护），watch-status.sh 展示"两端现在
+# 具体在干什么"要靠这两个文件，预先建好占位内容，避免仪表盘刚启动时展示空白
+{
+    date +%s
+    echo "(尚未开始)"
+} > "$DUAL_DIR/worker-phase.txt"
+{
+    date +%s
+    echo "(尚未开始)"
+} > "$DUAL_DIR/verifier-phase.txt"
+
+# 初始化事件日志（set-status.sh 每次状态转移时追加一行）
+: > "$DUAL_DIR/event-log.txt"
+
 echo ""
 echo "=========================================="
 echo "  环境初始化完成"
@@ -158,5 +172,10 @@ echo "  .dual-claude/verifier-violation-log.txt - Verifier 历史漏判记录（
 echo "  .dual-claude/task-history.md          - task.txt 的历史版本归档（set-task.sh 维护）"
 echo "  .dual-claude/checkpoint-count.txt     - 回滚点计数（checkpoint.sh 维护）"
 echo "  .dual-claude/no-blocker-streak.txt    - 连续无新增[阻塞]问题轮数（track-blocker-streak.sh 维护）"
+echo "  .dual-claude/worker-phase.txt         - Worker 当前阶段（heartbeat.sh 维护，watch-status.sh 展示用）"
+echo "  .dual-claude/verifier-phase.txt       - Verifier 当前阶段（heartbeat.sh 维护，watch-status.sh 展示用）"
+echo "  .dual-claude/event-log.txt            - 状态转移历史（set-status.sh 自动追加）"
+echo ""
+echo "💡 建议开第三个终端跑 'bash scripts/watch-status.sh' 实时盯着双方进度"
 echo ""
 echo "=========================================="

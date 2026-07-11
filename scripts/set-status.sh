@@ -14,6 +14,12 @@
 #   完整新内容，不会读到半截。
 #   同时做了取值校验，避免拼错状态名（比如敲成 "APPROVE" 而不是
 #   "APPROVED"）导致状态机卡死却没有任何报错。
+#
+#   顺带把每次状态转移追加进 event-log.txt——watch-status.sh 靠这份历史
+#   展示"这一路是怎么走过来的"，而不只是"现在是什么状态"。角色（Worker/
+#   Verifier/System）根据要设置的状态值推断，不需要额外传参、不用改调用
+#   方式：WORKER_DONE 只有 Worker 会设置，NEEDS_FIX/APPROVED/REJECTED 只
+#   有 Verifier 会设置，IDLE 只有 reset.sh 会设置。
 # ============================================================================
 
 set -eu
@@ -39,8 +45,19 @@ if [ ! -d "$DUAL_DIR" ]; then
     exit 1
 fi
 
+OLD_STATUS="$(cat "$DUAL_DIR/status.txt" 2>/dev/null || echo '?')"
+
 tmp="$(mktemp "$DUAL_DIR/.tmp.XXXXXX")"
 echo "$STATUS" > "$tmp"
 mv "$tmp" "$DUAL_DIR/status.txt"
+
+case "$STATUS" in
+    WORKER_DONE) ACTOR="Worker" ;;
+    NEEDS_FIX|APPROVED|REJECTED) ACTOR="Verifier" ;;
+    IDLE) ACTOR="System" ;;
+    *) ACTOR="?" ;;
+esac
+ITER="$(cat "$DUAL_DIR/iteration.txt" 2>/dev/null || echo '?')"
+echo "$(date '+%H:%M:%S') [${ACTOR}] ${OLD_STATUS} -> ${STATUS} (iter=${ITER})" >> "$DUAL_DIR/event-log.txt"
 
 echo "状态已设置为: $STATUS"
