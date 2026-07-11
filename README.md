@@ -96,8 +96,7 @@ dual-terminal-skill/
 │   ├── rollback-help.sh         # 打印回滚指引（不自动执行）
 │   ├── set-task.sh              # 更新 task.txt 并自动归档旧版本
 │   ├── next-round.sh            # 同一项目开始新一轮需求（set-task+reset的组合，保留信誉记录）
-│   ├── track-blocker-streak.sh  # 追踪"连续无新增[阻塞]问题"轮数
-│   └── heartbeat.sh             # 心跳上报脚本（给人看进度，非审查内容）
+│   └── track-blocker-streak.sh  # 追踪"连续无新增[阻塞]问题"轮数
 ├── README.md                       # 本文件
 ├── misc/                           # 外部参考文档（项目复盘记录、研究报告等）
 └── .gitignore                   # Git 忽略规则（忽略运行时生成的 .dual-claude/）
@@ -112,7 +111,7 @@ your-project/
 │       ├── worker-terminal.md      ← 从 SKILL-worker.md 复制
 │       └── verifier-terminal.md    ← 从 SKILL-verifier.md 复制
 │
-├── scripts/                         ← 从 scripts/ 整个目录复制（13 个脚本）
+├── scripts/                         ← 从 scripts/ 整个目录复制（12 个脚本）
 │   ├── start-dual-terminal.sh
 │   ├── watch-status.sh
 │   ├── reset.sh
@@ -124,8 +123,7 @@ your-project/
 │   ├── rollback-help.sh
 │   ├── set-task.sh
 │   ├── next-round.sh
-│   ├── track-blocker-streak.sh
-│   └── heartbeat.sh
+│   └── track-blocker-streak.sh
 │
 ├── .dual-claude/                    ← 运行时自动生成，项目根目录下（不在 scripts/ 内）
 │   ├── status.txt
@@ -168,7 +166,7 @@ cp SKILL-verifier.md .claude/skills/verifier-terminal.md
 ### 第二步：放置脚本文件
 
 ```bash
-# 复制脚本到项目根目录（13 个脚本一次性全部复制，不要漏）
+# 复制脚本到项目根目录（12 个脚本一次性全部复制，不要漏）
 mkdir -p scripts
 cp scripts/*.sh scripts/
 
@@ -189,11 +187,11 @@ ls -la .claude/skills/worker-terminal.md
 ls -la .claude/skills/verifier-terminal.md
 ls -la scripts/
 
-# 预期能看到 scripts/ 下有 13 个脚本：
+# 预期能看到 scripts/ 下有 12 个脚本：
 # start-dual-terminal.sh  watch-status.sh  reset.sh  wait-for-status.sh
 # set-status.sh  bump-iteration.sh  log-verifier-miss.sh
 # checkpoint.sh  rollback-help.sh  set-task.sh  next-round.sh
-# track-blocker-streak.sh  heartbeat.sh
+# track-blocker-streak.sh
 ```
 
 ---
@@ -864,9 +862,9 @@ model: claude-opus-4     # Verifier 用强推理模型
 
 ### 更换共享目录位置
 
-13 个脚本里都用同一种方式定位共享目录：`脚本所在目录的上一级` + `.dual-claude`
+12 个脚本里都用同一种方式定位共享目录：`脚本所在目录的上一级` + `.dual-claude`
 （即约定脚本永远放在项目根下的 `scripts/` 子目录里，共享目录在项目根）。如果
-要换成固定路径而不是"相对脚本位置"，需要**同时改全部 13 个脚本**，保持一致，
+要换成固定路径而不是"相对脚本位置"，需要**同时改全部 12 个脚本**，保持一致，
 否则会重现 v1 版"初始化脚本和其他脚本对目录位置的假设不一致"的那个 bug：
 
 ```bash
