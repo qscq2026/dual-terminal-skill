@@ -40,6 +40,7 @@ cp "$DUAL_DIR/event-log.txt" "$BACKUP_DIR/" 2>/dev/null || true
 cp "$DUAL_DIR/worker-phase.txt" "$BACKUP_DIR/" 2>/dev/null || true
 cp "$DUAL_DIR/verifier-phase.txt" "$BACKUP_DIR/" 2>/dev/null || true
 cp "$DUAL_DIR/limit.txt" "$BACKUP_DIR/" 2>/dev/null || true
+cp "$DUAL_DIR/min-iter.txt" "$BACKUP_DIR/" 2>/dev/null || true
 cp "$DUAL_DIR"/verifier-report-round-*.txt "$BACKUP_DIR/" 2>/dev/null || true
 
 # 重置状态（原子写：先写临时文件再 mv，避免另一终端在写入过程中读到半截内容）
@@ -65,9 +66,11 @@ echo "0" > "$DUAL_DIR/no-blocker-streak.txt"
 { date +%s; echo "(尚未开始)"; } > "$DUAL_DIR/worker-phase.txt"
 { date +%s; echo "(尚未开始)"; } > "$DUAL_DIR/verifier-phase.txt"
 
-# limit.txt 由 Verifier 在下一轮启动时按用户口头指定的值重新写入，这里直接
-# 移除，避免仪表盘展示上一轮遗留的旧上限
+# limit.txt / min-iter.txt 都由 Verifier 在下一轮启动时按用户口头指定的值
+# 重新写入，这里直接移除，避免仪表盘展示上一轮遗留的旧范围、也避免
+# set-status.sh 拿上一轮的下限去卡这一轮的 APPROVED
 rm -f "$DUAL_DIR/limit.txt"
+rm -f "$DUAL_DIR/min-iter.txt"
 
 # 注意：checkpoint-count.txt 和 task-history.md 不在这里重置——前者用来保证
 # git checkpoint 标签不因重置而重号覆盖历史回滚点，后者是跨任务的永久归档，

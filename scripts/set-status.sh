@@ -20,6 +20,14 @@
 #   Verifier/System）根据要设置的状态值推断，不需要额外传参、不用改调用
 #   方式：WORKER_DONE 只有 Worker 会设置，NEEDS_FIX/APPROVED/REJECTED 只
 #   有 Verifier 会设置，IDLE 只有 reset.sh 会设置。
+#
+#   写 APPROVED 之前，会检查迭代数有没有达到 min-iter.txt 里记的下限，没
+#   达到直接拒绝，不写入、不留任何余地。这是这套系统里少数几处不靠"写清
+#   楚规则、指望模型照做"、而是靠代码直接拒绝执行的地方——因为"迭代数够
+#   不够用户要求的下限"是一个纯粹可数的事实，不需要判断力，也就不应该
+#   交给判断力去决定。真实项目里出过用户说"至少15轮"、Verifier 第4轮就
+#   自己判了通过的事故，这个检查就是为了让同样的事故在代码层面不可能
+#   重演，而不是在文档里再多写一条"不要这样做"。
 # ============================================================================
 
 set -eu
@@ -43,6 +51,25 @@ esac
 if [ ! -d "$DUAL_DIR" ]; then
     echo "ERROR: $DUAL_DIR 不存在，请先运行 start-dual-terminal.sh" >&2
     exit 1
+fi
+
+if [ "$STATUS" = "APPROVED" ]; then
+    MIN_ITER="$(cat "$DUAL_DIR/min-iter.txt" 2>/dev/null || echo '')"
+    CUR_ITER="$(cat "$DUAL_DIR/iteration.txt" 2>/dev/null || echo '0')"
+    case "$MIN_ITER" in
+        ''|*[!0-9]*) : ;;  # 没设下限或内容非法，跳过这项检查
+        *)
+            case "$CUR_ITER" in
+                ''|*[!0-9]*) CUR_ITER=0 ;;
+            esac
+            if [ "$CUR_ITER" -lt "$MIN_ITER" ]; then
+                echo "ERROR: 拒绝写入 APPROVED——当前迭代数（${CUR_ITER}）未达到用户要求的下限（${MIN_ITER}）。" >&2
+                echo "这不是可以商量的判断，是硬约束：用户明确要求至少 ${MIN_ITER} 轮，现在还不够。" >&2
+                echo "继续判 NEEDS_FIX，把这一轮的审查结果正常写进报告。" >&2
+                exit 1
+            fi
+            ;;
+    esac
 fi
 
 OLD_STATUS="$(cat "$DUAL_DIR/status.txt" 2>/dev/null || echo '?')"

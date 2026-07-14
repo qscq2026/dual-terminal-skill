@@ -61,6 +61,7 @@ fingerprint() {
         "$DUAL_DIR/status.txt" \
         "$DUAL_DIR/iteration.txt" \
         "$DUAL_DIR/limit.txt" \
+        "$DUAL_DIR/min-iter.txt" \
         "$DUAL_DIR/no-blocker-streak.txt" \
         "$DUAL_DIR/worker-phase.txt" \
         "$DUAL_DIR/verifier-phase.txt" \
@@ -84,16 +85,20 @@ render() {
     echo "双终端协作监控        刷新: $(date '+%H:%M:%S')   (Ctrl+C 退出)"
     echo ""
 
-    local status iteration limit streak
+    local status iteration limit streak min_iter
     status=$(read_file "$DUAL_DIR/status.txt" "UNKNOWN")
     iteration=$(read_file "$DUAL_DIR/iteration.txt" "0")
     limit=$(read_file "$DUAL_DIR/limit.txt" "?")
+    min_iter=$(read_file "$DUAL_DIR/min-iter.txt" "")
     streak=$(read_file "$DUAL_DIR/no-blocker-streak.txt" "0")
 
     hr
     echo "状态机"
     hr
     printf "  当前状态: %-14s  迭代: %s / %s\n" "$status" "$iteration" "$limit"
+    if [ -n "$min_iter" ] && [ "$min_iter" != "$limit" ]; then
+        echo "  用户要求至少 ${min_iter} 轮（硬约束，迭代不够时 APPROVED 会被拒绝）"
+    fi
     echo "  连续无新增[阻塞]轮数: $streak"
     echo ""
 
